@@ -1,0 +1,17 @@
+# Capturas e dados sensíveis — nunca versionar sem sanitizar
+captures/*
+!captures/.gitkeep
+secrets/
+*.pcap
+*.pcapng
+*.btsnoop
+btsnoop_hci.log
+*.cfa
+*.log
+firmware-backup/
+*.bin
+*.hex
+.env
+__pycache__/
+.venv/
+node_modules/

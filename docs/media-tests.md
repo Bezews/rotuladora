@@ -24,22 +24,57 @@ Etiqueta opaca imprime 5x seguidas sem erro?
 
 1. Conferir se a bobina transparente é **térmica direta** (diz "direct thermal"/"sem tinta"; arranhar com a unha deixa marca escura). Se exigir ribbon, é incompatível.
 2. Verificar se o **liner** (papel de fundo) é opaco/branco. Liner transparente + etiqueta transparente = praticamente indetectável.
-3. No app (DLabel), escolher tipo de papel **"etiqueta com gap"** e tamanho exato (ex.: 40×30).
-4. Executar **calibração/aprendizado de papel** pelo próprio app ou rotina do manual da PT260 (não usar combinação de botões da M110).
+3. No app da impressora, escolher tipo de papel **"etiqueta com gap"** e tamanho exato (ex.: 40×30).
+4. Executar **calibração/aprendizado de papel** pelo próprio app ou rotina do manual da PT-260 ou `GAPDETECT` (seção 4) (não usar combinação de botões da M110).
 5. Teste de contorno: modo **contínuo** + comprimento fixo — se imprimir, confirma que só a detecção de gap falha.
 6. Limpar sensor (desligada, cotonete seco/álcool isopropílico) e conferir guia lateral do rolo.
 7. Contorno definitivo, se nada resolver: usar etiquetas transparentes **com marca preta** no verso, ou etiquetas BOPP "clear" de fabricantes que declaram compatibilidade com o sensor (a Phomemo vende transparentes específicas para M110 — o que reforça que é questão de mídia, não de firmware).
 
-## 4. Teste objetivo (futuro, após confirmar dialeto Marklife)
+## 4. Sequência TSPL para a transparente (PT-260 confirmada TSPL)
 
-Se a PT260 aceitar `1F 30 02` (ler sensor de reflexão/óptico) **e** isso aparecer em captura do app oficial, medir:
+Enviar pelo Serial Bluetooth Terminal (CR+LF), com a bobina transparente instalada. Medir antes largura, altura e gap.
 
-| Mídia | Valor sobre etiqueta | Valor sobre gap | Δ |
-|---|---|---|---|
-| Opaca branca | | | |
-| Transparente | | | |
+**Passo A — calibrar sensor de gap**
 
-Δ pequeno na transparente = limite físico do sensor; nenhum firmware resolve.
+```text
+SIZE 40 mm,30 mm
+GAP 2 mm,0 mm
+GAPDETECT
+```
+
+A impressora avança algumas etiquetas e aprende o limiar. Depois:
+
+```text
+CLS
+TEXT 16,16,"3",0,2,2,"CLEAR A"
+PRINT 1,1
+```
+
+Repetir o `PRINT` 3×. Se alinhar sempre → calibração resolveu (causa: limiar aprendido com mídia opaca).
+
+**Passo B — se A falhar: modo contínuo (contorno)**
+
+```text
+SIZE 40 mm,32 mm
+GAP 0 mm,0 mm
+CLS
+TEXT 16,16,"3",0,2,2,"CLEAR B"
+PRINT 1,1
+```
+
+`SIZE` = altura da etiqueta + gap (passo). Imprime sem procurar gap; desalinhamento acumula, mas confirma se o problema é só o sensor.
+
+**Passo C — voltar ao normal com a opaca**
+
+```text
+SIZE 40 mm,30 mm
+GAP 2 mm,0 mm
+GAPDETECT
+```
+
+`SIZE`/`GAP` costumam persistir: sempre restaurar após testes.
+
+Se `GAPDETECT` for ignorado (clone sem o comando), testar `AUTODETECT` e registrar o resultado.
 
 ## 5. Registro de testes
 

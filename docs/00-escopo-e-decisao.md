@@ -1,53 +1,33 @@
-# Escopo e decisão: "fazer a PT260 funcionar como M110"
+# Escopo e decisão: "fazer a PT-260 funcionar como M110"
 
-## 1. O que o pedido realmente significa
+## 1. Pedido original
 
-"Funcionar como M110" pode ter três significados diferentes, cada um com solução distinta:
+Alterar firmware ou hardware da PT-260 para que ela opere como uma Phomemo M110 (aparência semelhante).
 
-| Interpretação | O que o usuário ganha | Solução adequada |
+## 2. Evidência que decide a questão
+
+**[OBSERVADO 22/11/2026]** autoteste: `Model PT-260 · Version 6137 · App: TSPL+CPCL`. App de teste: TSPL/CPCL suportados, ESC/PPLB não.
+
+**[REFERENCIADO]** M110: protocolo proprietário estilo ESC/POS via BLE `0xFF02` (`phomemo-tools`, `pyphomemo`).
+
+Aparência semelhante vem de carcaça genérica (molde OEM comum em Shenzhen). Por dentro, firmwares de famílias diferentes.
+
+## 3. Avaliação dos caminhos
+
+| Caminho | Análise | Veredito |
 |---|---|---|
-| A. Usar o **app Phomemo (Print Master)** com a PT260 | Interface/templates da Phomemo | Ponte BLE ou nada; o app precisa reconhecer o aparelho |
-| B. Usar **ferramentas abertas da M110** (`phomemo-tools`, `pyphomemo`) | Impressão pelo PC/script | Driver nativo PT260 (mais simples que imitar M110) |
-| C. Obter **qualidade/recursos** de M110 | Ex.: sensor melhor p/ transparente | Nenhum firmware resolve limite físico de sensor |
+| Cross-flash firmware M110 | Exige mesmo MCU, pinagem, cabeça, sensor, bateria (PT-260 usa pack 2S ~7,4 V **[OBSERVADO]**; arquitetura de alimentação da M110 não confirmada), dump e recuperação via SWD. Nenhum disponível. Resultado provável: *brick*. Ganho: trocar padrão aberto (TSPL) por proprietário. | **Rejeitado** |
+| Trocar placa | Precisa M110 doadora; incompatibilidade mecânica/elétrica provável. | **Rejeitado** |
+| Ponte BLE "M110 → TSPL" (ESP32) | Tecnicamente possível, mas só serviria para usar o app Phomemo. Sem benefício real. | **Arquivado** |
+| **Driver TSPL próprio** | Linguagem documentada, QR nativo, texto puro, testável sem hardware. | **Adotado** |
 
-O objetivo real declarado (etiquetas do inventário com QR) é atendido por **B**, sem tocar na impressora.
+## 4. Plano
 
-## 2. Por que não trocar o firmware
+1. Confirmar transporte (nRF Connect; Serial Bluetooth Terminal) — `android-ferramentas.md`.
+2. Imprimir etiqueta de teste TSPL manual.
+3. Diagnosticar etiqueta transparente com `GAPDETECT`/modos de mídia — `media-tests.md`.
+4. Integrar gerador TSPL ao inventário (Web Bluetooth no Android ou agente local) — `inventario-integracao.md`.
 
-**[REFERENCIADO]** Projetos abertos da M110 documentam apenas protocolo (sniffing BLE). Não há dump público de firmware, identificação de MCU, nem teardown da M110 localizados em 22/11/2026.
+## 5. Fora do escopo
 
-Para um cross-flash ser sequer avaliável seriam necessários, **todos**:
-
-1. Mesmo MCU/SoC e mesma memória flash nas duas placas (exige abrir ambas).
-2. Mesma pinagem para cabeça térmica, motor de passo, sensor de gap, bateria, LED e botão.
-3. Mesma cabeça térmica (largura em dots, resistência, *strobe*) — senão sobreaquece ou imprime falho.
-4. Backup integral do firmware original (SWD/UART), com restauração testada.
-5. Formato da imagem de atualização e eventual assinatura/checksum conhecidos.
-
-Hoje temos **zero de cinco**. Além disso:
-
-- **[REFERENCIADO]** O SDK Marklife (família provável da PT260) expõe `1F A0 BE 66 88` = *Enter BOOT mode*. Isso confirma que o firmware é atualizável via BLE — e que um envio errado pode deixar a impressora em modo bootloader sem imagem válida.
-- Firmware M110 dentro da PT260 teria **outro dialeto de comandos** (ver `protocol-notes.md`), logo só o app Phomemo passaria a funcionar; o DLabel deixaria de funcionar.
-- Mesmo funcionando, não resolveria o problema da etiqueta transparente se a causa for óptica (sensor/mídia).
-
-**Conclusão:** risco alto, ganho baixo. Fora do escopo.
-
-## 3. Por que não trocar o hardware
-
-Trocar a placa-mãe exige uma M110 doadora. Custo ≥ comprar uma M110, com risco de incompatibilidade mecânica (conectores, flat da cabeça, bateria). Não faz sentido econômico.
-
-## 4. Caminho escolhido
-
-1. **Diagnóstico de mídia** (etiqueta transparente) — `media-tests.md`.
-2. **Identificação passiva** (fotos, nome BLE, GATT) — `hardware.md`, `tools/ble_inspect.py`.
-3. **Captura do app original** (Android *HCI snoop log*) imprimindo uma etiqueta conhecida.
-4. **Confronto** da captura com os dialetos Marklife e Phomemo já documentados.
-5. **Driver nativo** com perfil `pt260` e denylist embutida.
-6. **Integração** com o inventário via agente local.
-7. *(Opcional)* **Ponte M110** em ESP32: anuncia-se como M110, traduz, por exemplo, "mídia gap" Phomemo `1F 11 0A` → Marklife `1F 80 01 20`. Só se o item A da tabela for de fato desejado.
-
-## 5. Fora do escopo (explicitamente)
-
-- Flash de firmware, entrada em BOOT, reset de fábrica.
-- Varredura cega de opcodes (*fuzzing*).
-- Abrir a impressora antes do Sprint 2 (perde garantia; só se o proprietário autorizar para fotografar a placa).
+Flash de firmware, ferramentas de atualização do fabricante, `DOWNLOAD`/`INITIALPRINTER`/`KILL`, abertura do equipamento.

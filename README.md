@@ -1,61 +1,75 @@
-# rotuladora — PT260 / XD-210 lab
+# rotuladora — PT-260 lab
 
-Investigação técnica, diagnóstico e futuro driver para a rotuladora térmica **PT260** (também referida como **XD-210**), visualmente semelhante à **Phomemo M110**. Objetivo final: imprimir etiquetas (texto + QR Code) a partir do inventário doméstico `inventario.caiobezerra.com`.
+Diagnóstico e driver da rotuladora térmica **PT-260** para imprimir etiquetas (texto + QR Code) do inventário doméstico `inventario.caiobezerra.com`.
 
-> **Status:** `discovery` — nenhuma afirmação sobre a unidade real foi verificada fisicamente ainda.
-> Toda afirmação neste repositório é marcada como **[OBSERVADO]** (visto na unidade), **[REFERENCIADO]** (fonte pública citada) ou **[HIPÓTESE]**.
+> **Status:** protocolo identificado por evidência física; driver TSPL experimental pronto, sem teste em hardware ainda.
+> Marcadores: **[OBSERVADO]** (visto na unidade), **[REFERENCIADO]** (fonte pública), **[HIPÓTESE]**.
 
-## Pedido original e decisão de escopo
+## Achado decisivo (22/11/2026)
 
-O pedido inicial foi *"alterar o firmware ou hardware da PT260 para que ela funcione como se fosse uma M110"*. Após análise, a decisão é:
-
-| Caminho | Veredito | Motivo resumido |
-|---|---|---|
-| Cross-flash do firmware M110 na PT260 | **Rejeitado (alto risco)** | Sem dump, sem bootloader conhecido, sem prova de placa idêntica; risco real de *brick*. O SDK Marklife documenta até um comando de entrada em BOOT (`1F A0 BE 66 88`), prova de que existe caminho de atualização — e de que um byte errado pode acioná-lo. |
-| Trocar a placa da PT260 por uma placa M110 | **Inviável economicamente** | Exige comprar uma M110 para canibalizar; mais barato usar a própria M110. |
-| **Driver nativo PT260** (software externo, reversível) | **Recomendado** | Zero risco ao hardware; cobre o caso real (inventário). |
-| Ponte BLE "finge ser M110" (ex.: ESP32) | **Opcional, fase futura** | Só se for indispensável usar o app Phomemo. Reversível, mas depende de conhecer os dois protocolos. |
-
-Detalhes e justificativas: [`docs/00-escopo-e-decisao.md`](docs/00-escopo-e-decisao.md).
-
-## Achado-chave da pesquisa (22/11/2026)
-
-- Manuais públicos da PT260 indicam o app **DLabel / Marklife** **[REFERENCIADO]**, não o Print Master da Phomemo.
-- O SDK oficial Marklife (npm `marklife-label-printer-web-kit`) usa **GATT `0xFF02` (escrita) + `0xFF03` (crédito/fluxo)** e comandos da família **`0x1F xx`** (mídia em `1F 80 01 <tipo>`, posicionamento em `1F 11 …`) **[REFERENCIADO]**.
-- A Phomemo M110 (projetos `phomemo-tools`/`pyphomemo`) também escreve em `0xFF02` e usa `1F 11 <modo>` para mídia **[REFERENCIADO]**.
-- **Porém a semântica diverge**: o mesmo `1F 11` define mídia na Phomemo e move papel na Marklife; códigos de mídia também diferem (Marklife `0x10/0x20/0x30`; Phomemo `0x0A/0x0B/0x26`). Mesmo layout GATT e mesmo prefixo **não** significam compatibilidade byte a byte — sugere uma linhagem OEM comum com dialetos diferentes **[HIPÓTESE]**.
-
-Análise completa: [`docs/protocol-notes.md`](docs/protocol-notes.md) e [`docs/compat-matrix.md`](docs/compat-matrix.md).
-
-## Mapa do repositório
+Página de autoteste da unidade **[OBSERVADO]**:
 
 ```text
-README.md
-docs/
-  00-escopo-e-decisao.md     # por que não cross-flash; caminhos avaliados
-  hardware.md                # ficha de evidências da unidade (a preencher)
-  transport-observations.md  # BLE/USB observado (a preencher)
-  protocol-notes.md          # Phomemo vs Marklife; denylist de comandos perigosos
-  compat-matrix.md           # PT260 x Phomemo x NIIMBOT x Marklife
-  media-tests.md             # diagnóstico da etiqueta transparente
-  risk-register.md           # riscos e mitigação
-  inventario-integracao.md   # arquitetura com inventario.caiobezerra.com
-  roadmap.md                 # sprints e critérios de aceite
-  research-links.md          # fontes
-  fonte/handoff-original-2026-11-21.md
-tools/
-  ble_inspect.py             # inspeção BLE SOMENTE LEITURA (scan + GATT)
-captures/  (gitignored)      # capturas privadas
-fixtures/                    # amostras anonimizadas
+Model: PT-260   Version: 6137   App: TSPL+CPCL
+BT NAME: PT-260_FE9C   PIN: 0000
 ```
 
-## Regras de segurança do projeto
+App de diagnóstico: **TSPL suportado, CPCL suportado, ESC/POS não suportado**.
 
-1. **Nunca** enviar bytes à impressora antes de identificar o protocolo (Sprint 2).
-2. **Nunca** enviar comandos da denylist (`docs/protocol-notes.md#denylist`), em especial BOOT/fábrica.
-3. **Nunca** versionar MAC, serial, capturas brutas ou tokens.
-4. Firmware: fora de escopo até existirem backup integral + recuperação comprovada (ver `docs/risk-register.md`).
+Conclusões:
 
-## Próximo passo (bloqueante)
+1. A PT-260 **não** é uma Phomemo M110 rebatizada. A M110 usa protocolo proprietário (`1F xx`, `1B 4E xx`, raster ESC/POS); a PT-260 roda firmware **TSPL/CPCL**, outra família.
+2. **TSPL é uma linguagem aberta e documentada** (TSC). Não há protocolo a descobrir: o driver gera texto ASCII (`SIZE`, `GAP`, `TEXT`, `QRCODE`, `PRINT`).
+3. "Transformar em M110" deixa de fazer sentido: seria trocar um padrão aberto por um proprietário. Firmware e hardware **não serão alterados**.
+4. PIN `0000` → Bluetooth Classic SPP; app conectou no iPhone → provavelmente também BLE (dual-mode) **[HIPÓTESE]**, a confirmar com nRF Connect.
 
-Preencher [`docs/hardware.md`](docs/hardware.md) — principalmente: etiqueta inferior, app que acompanha, nome Bluetooth e saída de `tools/ble_inspect.py`.
+## Decisão de escopo
+
+| Caminho | Veredito |
+|---|---|
+| Cross-flash do firmware M110 | **Rejeitado** — famílias de firmware diferentes, risco de *brick*, ganho nulo |
+| Trocar placa por placa M110 | **Rejeitado** — inviável e desnecessário |
+| **Driver TSPL próprio** | **Adotado** — `src/pt260/tspl.py` |
+| Ponte "finge ser M110" | **Arquivado** — sem motivo, TSPL já é aberto |
+
+Detalhes: [`docs/00-escopo-e-decisao.md`](docs/00-escopo-e-decisao.md).
+
+## Uso rápido
+
+```bash
+python tools/tspl_send.py --item FER-0042 "Furadeira de impacto" "HTTPS://INVENTARIO.CAIOBEZERRA.COM/I/FER-0042/TOKEN"
+```
+
+Sem `--send`, só mostra o job (dry-run). Para imprimir pelo PC via Bluetooth Classic (porta serial pareada):
+
+```bash
+python tools/tspl_send.py --text "TESTE" --port COM5 --send
+```
+
+No Android: [`docs/android-ferramentas.md`](docs/android-ferramentas.md).
+
+## Mapa
+
+```text
+docs/
+  00-escopo-e-decisao.md     decisão e alternativas
+  hardware.md                ficha de evidências da unidade (observado)
+  android-ferramentas.md     nRF Connect, HCI log, Serial Bluetooth Terminal
+  protocol-notes.md          TSPL usado + denylist; dialetos Phomemo/Marklife como referência
+  compat-matrix.md           PT-260 x Phomemo x NIIMBOT x Marklife
+  media-tests.md             diagnóstico da etiqueta transparente (GAPDETECT etc.)
+  transport-observations.md  BLE/SPP observado (a preencher)
+  inventario-integracao.md   integração com inventario.caiobezerra.com
+  risk-register.md, roadmap.md, research-links.md
+  fonte/handoff-original-2026-11-21.md
+src/pt260/tspl.py            gerador TSPL + denylist
+tools/tspl_send.py           dry-run / .prn / envio SPP
+tools/ble_inspect.py         inspeção BLE somente leitura
+tests/                       pytest (sem hardware)
+```
+
+## Regras de segurança
+
+1. Denylist TSPL ativa no código: `DOWNLOAD`, `KILL`, `MOVE`, `RUN`, `INITIALPRINTER`, `SET COUNTER` etc.
+2. Nunca usar ferramenta de atualização de firmware.
+3. Nunca versionar MAC completo, serial, capturas ou tokens (`captures/` no `.gitignore`).

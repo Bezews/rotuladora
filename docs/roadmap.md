@@ -2,18 +2,19 @@
 
 | Sprint | Entrega | Aceite | Status |
 |---|---|---|---|
-| 0 — Dados | Fotos, app, bobinas, cenário de erro | Problema classificado como mídia/sensor, app ou conexão | ⏳ aguardando proprietário |
-| 1 — Transporte | `ble_inspect.py` + nRF Connect, VID/PID | Ficha `transport-observations.md` preenchida | ⏳ |
-| 2 — Protocolo | Captura HCI do app oficial imprimindo "A" | Dialeto confirmado (Marklife? outro?) com bytes observados | ⏳ |
-| 3 — Driver | `transport/`, `protocol/`, `renderer/`, perfil `pt260`, allowlist+denylist | 10 etiquetas opacas seguidas, previsíveis | ⏳ |
-| 4 — Inventário | Web Bluetooth ou agente local; template 40×30 com QR | Criar item → etiqueta impressa, repetível | ⏳ |
-| 5 — Opcional | Ponte ESP32 "M110" | App Phomemo imprime via ponte | ❔ só se desejado |
+| 0 — Dados | Fotos, autoteste, app | Unidade identificada | ✅ 22/11 (modelo, fw 6137, TSPL+CPCL, BT) |
+| 1 — Transporte | nRF Connect (UUIDs BLE) + Serial Bluetooth Terminal (SPP) | `transport-observations.md` preenchido | ⏳ proprietário |
+| 2 — Protocolo | TSPL confirmado por autoteste | Etiqueta manual TSPL impressa | 🟡 identificado; falta teste prático |
+| 3 — Driver | `src/pt260/tspl.py` + `tools/tspl_send.py` + denylist + testes | 10 etiquetas opacas seguidas, previsíveis | 🟡 código pronto, sem hardware |
+| 3b — Mídia | Sequência GAPDETECT/contínuo (`media-tests.md`) | Transparente alinha 3× ou limite físico documentado | ⏳ |
+| 4 — Inventário | Rota TSPL no inventário + Web Bluetooth (Android Chrome) | Criar item → etiqueta impressa, repetível | ⏳ depende UUID BLE |
+| 5 — Ponte M110 | — | — | ❌ arquivado (TSPL aberto torna desnecessário) |
 
 ## Perguntas abertas (bloqueiam Sprint 0)
 
-1. Texto literal da etiqueta inferior (PT260, XD-210, GS-PT260?).
-2. App que acompanha (DLabel/Marklife? MLabel? outro?).
-3. Nome Bluetooth exato.
+1. ~~Texto da etiqueta inferior~~ → PT-260, fw 6137 (respondido).
+2. Nome do app usado na captura de tela.
+3. ~~Nome Bluetooth~~ → PT-260_FE9C (respondido). Falta: UUIDs BLE.
 4. Rolo transparente: marca, tamanho, liner, térmico direto?
 5. "Não reconheceu" = erro, avança várias, sai branco, desalinha?
 6. Opaca imprime várias vezes seguidas sem falhar?

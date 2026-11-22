@@ -1,49 +1,61 @@
 # Notas de protocolo
 
-> Nada aqui foi validado contra a PT260 do proprietário. São dialetos **de referência** para confronto com capturas futuras.
+## 0. Resultado (22/11/2026)
 
-## 1. Comparativo de dialetos conhecidos
+**[OBSERVADO]** Autoteste da unidade: `App: TSPL+CPCL`, firmware `6137`. App de diagnóstico: TSPL e CPCL suportados; ESC/POS e PPLB não.
 
-| Função | Phomemo M110 **[REFERENCIADO: phomemo-tools / pyphomemo]** | Marklife (DLabel) **[REFERENCIADO: SDK npm oficial 1.1.4]** |
+Consequência: a PT-260 usa **TSPL** (linguagem da TSC, texto ASCII, documentada publicamente) e **CPCL** (linguagem estilo Zebra móvel). Não usa o protocolo proprietário da Phomemo M110 nem o dialeto `0x1F` da Marklife. A hipótese "família Marklife" da primeira versão destas notas está **descartada**.
+
+## 1. TSPL — subconjunto usado pelo driver
+
+Referência: manual TSPL/TSPL2 da TSC **[REFERENCIADO]**. Clones implementam subconjuntos: cada comando precisa ser confirmado na unidade.
+
+| Comando | Função | Persistente? |
 |---|---|---|
-| Serviço / escrita BLE | `0xFF00` / escrita `0xFF02` (blocos ~128 B) | escrita `0xFF02` (blocos 90 B) |
-| Controle de fluxo | não documentado nos projetos | créditos via notify `0xFF03` |
-| Tipo de mídia | `1F 11 <m>` — `0A` gap, `0B` contínuo, `26` marca preta | `1F 80 01 <t>` (set) — `10` contínuo, `20` gap, `30` marca preta; `1F 12 <m> 00` = localizar gap/marca |
-| Velocidade | `1B 4E 0D <v>` | `1F 60 01 <0..2>` |
+| `SIZE w mm,h mm` | tamanho da etiqueta | sim (em muitos firmwares) |
+| `GAP g mm,o mm` | etiqueta com gap; `GAP 0,0` = contínuo | sim |
+| `BLINE b mm,o mm` | marca preta | sim |
+| `DIRECTION d,m` | orientação | não |
+| `REFERENCE x,y` | origem | não |
+| `DENSITY 0..15` | escurecimento | sim |
+| `SPEED n` | velocidade (portáteis costumam ignorar) | sim |
+| `CLS` | limpa buffer de imagem | não |
+| `TEXT x,y,"font",rot,mx,my,"txt"` | texto (fontes `"1"`..`"8"`) | não |
+| `QRCODE x,y,ECC,cell,A,rot,"dados"` | QR Code nativo (sem rasterizar) | não |
+| `BITMAP x,y,wBytes,h,mode,dados` | imagem 1-bit | não |
+| `BOX`, `BAR` | linhas/retângulos | não |
+| `PRINT m,n` | imprime m conjuntos, n cópias | não |
+| `FORMFEED`, `HOME` | avança uma etiqueta / acha início | não |
+| `GAPDETECT [x,y]` | **calibra sensor de gap** (avança papel) | sim (calibração) |
+| `AUTODETECT` | detecção automática de mídia (TSPL2) | sim |
+| `SELFTEST` | imprime autoteste | não |
+| `<ESC>!?` (`1B 21 3F`) | status 1 byte em tempo real | não |
+| `~!T` | nome do modelo | não |
+
+Coordenadas em dots: 203 dpi = 8 dots/mm. Etiqueta 40×30 mm = 320×240 dots.
+
+## 2. Denylist (implementada em `src/pt260/tspl.py`)
+
+| Comando | Motivo |
+|---|---|
+| `DOWNLOAD` | grava arquivo/programa na flash |
+| `KILL`, `MOVE`, `RUN` | apaga/move/executa arquivos armazenados |
+| `INITIALPRINTER` | reset de fábrica |
+| `SET COUNTER`, `SET RESPONSE`, `SET COM1`, `SET KEY`, `SET HEAD`, `SET PRINTKEY`, `SET REPRINT` | configuração persistente fora do escopo |
+| qualquer ferramenta de atualização de firmware do fabricante | risco de *brick* |
+
+## 3. Referência histórica: dialetos que **não** são o da PT-260
+
+Mantido para a matriz de compatibilidade e para uma eventual ponte.
+
+| Função | Phomemo M110 [REFERENCIADO: phomemo-tools/pyphomemo] | Marklife [REFERENCIADO: SDK npm 1.1.4] |
+|---|---|---|
+| Transporte | BLE, escrita `0xFF02` | BLE, escrita `0xFF02`, créditos `0xFF03` |
+| Mídia | `1F 11 <0A gap / 0B contínuo / 26 marca>` | `1F 80 01 <10/20/30>` |
 | Densidade | `1B 4E 04 <d>` | `1F 70 01 <1..15>` |
-| Raster | `1D 76 30 00 wL wH hL hH` + bitmap (estilo ESC/POS) | bitmap com compressão proprietária |
-| Início/fim de job | rodapé `1F F0 05 00`, `1F F0 03 00` | `1F C0 01 00` / `1F C0 01 01` |
-| Alinhar papel | — | `1F 11 51` (início) / `1F 11 50` (fim); `1F 11 <m> dH dL` = avanço/recuo manual |
-| Aprender papel (calibração) | — | `1F 30 60` |
-| Ler sensor óptico | — | `1F 30 02` (reflexão) |
-| Status / bateria / versão | — | `1F 20 00`, `10 FF 50 F1`, `10 FF 20 F1` |
+| Raster | `1D 76 30 00 wL wH hL hH` + bitmap | bitmap com compressão proprietária |
+| BOOT/firmware | não documentado | `1F A0 BE 66 88` (entra em modo BOOT) |
 
-Observação: os bytes da M110 vêm da documentação comunitária (README do `phomemo-tools`); **conferir a versão atual do repositório antes de usar**. Os bytes Marklife vêm do pacote npm oficial (licença restritiva: citamos fatos, não copiamos código).
+## 4. CPCL
 
-## 2. Leitura analítica
-
-- **Mesmo layout GATT (`FF00/FF02/FF03`)** aparece em muitas térmicas chinesas baratas porque vem do módulo/firmware BLE de referência do fabricante do chip — **não** identifica o fabricante da impressora.
-- **Prefixo `0x1F`** comum sugere SDK OEM de mesma origem **[HIPÓTESE]**, mas a semântica do mesmo opcode diverge (`1F 11` = "definir mídia" na Phomemo; "ajustar posição/avançar papel" na Marklife). Enviar comandos de um dialeto ao outro pode ter efeito **diferente do esperado**.
-- Consequência para o "modo M110": uma ponte teria de **traduzir** comandos, não só repassá-los.
-- Para a etiqueta transparente, o dialeto Marklife expõe exatamente o que interessa: **aprender papel** e **ler valor do sensor óptico**. Se a PT260 for Marklife, dá para medir o contraste do sensor com mídia opaca vs transparente — teste objetivo. Só após confirmação do dialeto por captura.
-
-## 3. Denylist
-
-Comandos que o driver deste projeto **nunca** enviará, independentemente do perfil:
-
-| Bytes | Significado referenciado | Risco |
-|---|---|---|
-| `1F A0 BE 66 88` | Entrar em modo BOOT (Marklife) | *brick* / bootloader |
-| `1F 50 BE` | Reset de fábrica (Marklife) | perda de calibração |
-| `10 FF 12 ..` | Alterar tempo de desligamento | alteração persistente |
-| qualquer opcode não observado em captura do app original | desconhecido | escrita em flash |
-
-O driver deve operar com **allowlist** por perfil (só bytes vistos em captura) e checar a denylist como segunda barreira.
-
-## 4. Como confirmar o dialeto da PT260 (sem risco)
-
-1. Android → Opções do desenvolvedor → *Ativar registro de snoop HCI Bluetooth*.
-2. Abrir o app que acompanha a PT260, conectar, imprimir **uma** etiqueta simples (ex.: texto "A").
-3. Gerar *bug report* e extrair `btsnoop_hci.log` → salvar em `captures/` (gitignored).
-4. Abrir no Wireshark, filtro `btatt.opcode == 0x52 || btatt.opcode == 0x12` (Write Command/Request).
-5. Comparar os primeiros bytes com a tabela acima e registrar em `transport-observations.md` — bytes **observados** separados de interpretação.
+Suportado pela unidade. Não será usado na v1 (TSPL cobre tudo e tem QR nativo). Registrar caso TSPL apresente limitação.

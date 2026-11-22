@@ -19,19 +19,20 @@
 | Marcas regulatórias | CE, FCC (sem FCC ID visível na foto) | foto da base | média |
 | Mídia que funciona | etiqueta branca opaca, liner azul-esverdeado, separada por **gap** | foto do rolo | alta |
 | Sistema do celular na captura | iOS (barra de status) | captura de tela | alta |
+| Bluetooth | **dual-mode (Classic + LE)**; serviços `0x18F0`, `0xFEE7`, `0xFF00`, `e7810a71…`, `49535343…` (ISSC Transparent UART); GATT sem bond | nRF Connect (Android) | alta |
 
 ## Implicações
 
 1. **TSPL/CPCL ≠ protocolo Phomemo.** A M110 usa protocolo proprietário estilo ESC/POS com comandos `1F xx` e `1B 4E xx`. A PT-260 recusa ESC no teste do app. São famílias de firmware diferentes: **não** é M110 rebatizada.
 2. **TSPL é linguagem aberta e documentada** (TSC TSPL/TSPL2). Não há protocolo a descobrir por engenharia reversa: dá para gerar jobs em texto puro.
-3. **PIN 0000** indica perfil **Bluetooth Classic SPP**. O app no iPhone também conectou → muito provável módulo **dual-mode** (Classic + BLE), já que iOS não abre SPP sem certificação MFi. Confirmar serviços BLE com nRF Connect.
+3. **PIN 0000** = perfil Bluetooth Classic SPP. nRF Connect confirmou **dual-mode** (Classic + LE) com cinco serviços de dados — ver `transport-observations.md`.
 4. Bateria 2S (≈7,4 V) e cabeça com sensor térmico: perfil de impressora "industrial portátil" chinesa genérica com firmware TSPL, não de rotuladora de consumo estilo Phomemo/NIIMBOT.
 
 ## Pendente
 
 | Campo | Como obter |
 |---|---|
-| Serviços/características BLE (UUIDs, propriedades) | nRF Connect (Android) → ver `docs/android-ferramentas.md` |
+| Características BLE de cada serviço (propriedades) | expandir serviços no nRF Connect ou usar `web/teste-bluetooth.html` |
 | Nome do app usado na captura de tela | informar |
 | Rolo transparente: marca, medidas, liner, térmico direto? | foto da caixa/rolo |
 | Medidas exatas da etiqueta opaca (L×A, gap) | régua |

@@ -21,7 +21,8 @@ Conclusões:
 1. A PT-260 **não** é uma Phomemo M110 rebatizada. A M110 usa protocolo proprietário (`1F xx`, `1B 4E xx`, raster ESC/POS); a PT-260 roda firmware **TSPL/CPCL**, outra família.
 2. **TSPL é uma linguagem aberta e documentada** (TSC). Não há protocolo a descobrir: o driver gera texto ASCII (`SIZE`, `GAP`, `TEXT`, `QRCODE`, `PRINT`).
 3. "Transformar em M110" deixa de fazer sentido: seria trocar um padrão aberto por um proprietário. Firmware e hardware **não serão alterados**.
-4. PIN `0000` → Bluetooth Classic SPP; app conectou no iPhone → provavelmente também BLE (dual-mode) **[HIPÓTESE]**, a confirmar com nRF Connect.
+4. Bluetooth **dual-mode confirmado** (nRF Connect): Classic SPP (PIN `0000`) + LE com serviços `0x18F0`, `0xFF00`, `e7810a71…` e `49535343…` (Microchip Transparent UART). GATT conecta sem pareamento → Web Bluetooth viável.
+5. Firmware novo/backup avaliado em [`docs/firmware-analise.md`](docs/firmware-analise.md): etiqueta colorida **não** depende de firmware; backup exige abrir a placa e quase sempre esbarra em proteção de leitura.
 
 ## Decisão de escopo
 
@@ -46,7 +47,7 @@ Sem `--send`, só mostra o job (dry-run). Para imprimir pelo PC via Bluetooth Cl
 python tools/tspl_send.py --text "TESTE" --port COM5 --send
 ```
 
-No Android: [`docs/android-ferramentas.md`](docs/android-ferramentas.md).
+No Android: [`docs/android-ferramentas.md`](docs/android-ferramentas.md). Teste direto pelo Chrome: [`web/teste-bluetooth.html`](web/teste-bluetooth.html) (precisa de HTTPS — ex.: GitHub Pages).
 
 ## Mapa
 
@@ -55,6 +56,7 @@ docs/
   00-escopo-e-decisao.md     decisão e alternativas
   hardware.md                ficha de evidências da unidade (observado)
   android-ferramentas.md     nRF Connect, HCI log, Serial Bluetooth Terminal
+  firmware-analise.md        backup/firmware novo: viabilidade e riscos
   protocol-notes.md          TSPL usado + denylist; dialetos Phomemo/Marklife como referência
   compat-matrix.md           PT-260 x Phomemo x NIIMBOT x Marklife
   media-tests.md             diagnóstico da etiqueta transparente (GAPDETECT etc.)
@@ -65,6 +67,7 @@ docs/
 src/pt260/tspl.py            gerador TSPL + denylist
 tools/tspl_send.py           dry-run / .prn / envio SPP
 tools/ble_inspect.py         inspeção BLE somente leitura
+web/teste-bluetooth.html     Web Bluetooth: lista GATT, imprime TSPL, GAPDETECT, status
 tests/                       pytest (sem hardware)
 ```
 

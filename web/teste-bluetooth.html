@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PT-260 Bluetooth</title>
+<style>
+  :root { --bg:#f6f6f4; --fg:#1b1b1a; --muted:#6b6b66; --card:#fff; --line:#ddd; --acc:#1f5fbf; --warn:#a4421b; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#151515; --fg:#ececea; --muted:#9a9a94; --card:#1f1f1f; --line:#333; --acc:#6ea2ff; --warn:#f08a5d; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.45 system-ui, sans-serif; }
+  main { max-width:720px; margin:0 auto; padding:16px; }
+  h1 { font-size:20px; margin:4px 0 2px; } h2 { font-size:15px; margin:0 0 8px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; margin:12px 0; }
+  .muted { color:var(--muted); font-size:13px; }
+  label { display:block; font-size:13px; color:var(--muted); margin-top:8px; }
+  input, select, textarea { width:100%; padding:8px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--fg); font:inherit; }
+  textarea { font-family:ui-monospace, monospace; font-size:12px; min-height:150px; }
+  .row { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  button { margin:10px 8px 0 0; padding:9px 14px; border:0; border-radius:6px; background:var(--acc); color:#fff; font:inherit; cursor:pointer; }
+  button.sec { background:transparent; color:var(--acc); border:1px solid var(--acc); }
+  button:disabled { opacity:.4; cursor:default; }
+  pre { white-space:pre-wrap; word-break:break-all; font-size:12px; max-height:260px; overflow:auto; margin:0; }
+  .warn { color:var(--warn); }
+  @media (max-width:480px) { .row { grid-template-columns:repeat(2,1fr); } }
+</style>
+</head>
+<body>
+<main>
+  <h1>PT-260 — teste Bluetooth (TSPL)</h1>
+  <p class="muted">Chrome no Android ou desktop. Lista serviços BLE e envia etiquetas TSPL. Nada é enviado sem clique. Comandos perigosos (DOWNLOAD, KILL, RUN, INITIALPRINTER, SET COUNTER…) são bloqueados.</p>
+
+  <div class="card">
+    <h2>1. Conectar</h2>
+    <button id="btnConnect">Procurar PT-260</button>
+    <button id="btnDisconnect" class="sec" disabled>Desconectar</button>
+    <label>Característica de escrita</label>
+    <select id="charSel" disabled><option>— conecte primeiro —</option></select>
+    <label>Tamanho do bloco (bytes)</label>
+    <input id="chunk" type="number" value="20" min="20" max="512">
+  </div>
+
+  <div class="card">
+    <h2>2. Etiqueta</h2>
+    <div class="row">
+      <div><label>Largura mm</label><input id="w" type="number" value="40"></div>
+      <div><label>Altura mm</label><input id="h" type="number" value="30"></div>
+      <div><label>Gap mm (0 = contínuo)</label><input id="gap" type="number" value="2" step="0.5"></div>
+      <div><label>Densidade 0–15</label><input id="dens" type="number" value="8" min="0" max="15"></div>
+    </div>
+    <label>Texto</label><input id="txt" value="TESTE PT-260">
+    <label>QR Code (vazio = sem QR)</label><input id="qr" value="HTTPS://INVENTARIO.CAIOBEZERRA.COM">
+    <label>Job TSPL (editável)</label>
+    <textarea id="job"></textarea>
+    <button id="btnPrint" disabled>Imprimir</button>
+    <button id="btnGap" class="sec" disabled>Calibrar gap (GAPDETECT)</button>
+    <button id="btnStatus" class="sec" disabled>Status (&lt;ESC&gt;!?)</button>
+  </div>
+
+  <div class="card">
+    <h2>Log</h2>
+    <pre id="log"></pre>
+  </div>
+</main>
+<script>
+const SERVICES = [
+  "e7810a71-73ae-499d-8c15-faa9aef0c3f2",
+  "49535343-fe7d-4ae5-8fa9-9fafd205e455",
+  0x18f0, 0xff00, 0xfee7, 0x180a,
+];
+const DENY = ["DOWNLOAD","KILL","MOVE","RUN","INITIALPRINTER","SET COUNTER","SET RESPONSE","SET COM1","SET KEY","SET HEAD","SET PRINTKEY","SET REPRINT","~!F"];
+const $ = (id) => document.getElementById(id);
+let device, chars = [], notifyChars = [];
+
+function log(msg) { $("log").textContent += msg + "\n"; $("log").scrollTop = 1e9; }
+const q = (s) => '"' + s.normalize("NFD").replace(/[^\x20-\x7e]/g, "").replace(/"/g, '\\["]') + '"';
+
+function buildJob() {
+  const w = +$("w").value, h = +$("h").value, g = +$("gap").value, d = +$("dens").value;
+  const lines = [`SIZE ${w} mm,${h} mm`, `GAP ${g} mm,0 mm`, "DIRECTION 1,0", "REFERENCE 0,0", `DENSITY ${d}`, "CLS"];
+  const hasQr = $("qr").value.trim().length > 0;
+  if (hasQr) lines.push(`QRCODE 16,16,M,4,A,0,${q($("qr").value.trim())}`);
+  lines.push(`TEXT ${hasQr ? 160 : 16},16,"3",0,1,1,${q($("txt").value)}`);
+  lines.push("PRINT 1,1");
+  $("job").value = lines.join("\n");
+}
+["w","h","gap","dens","txt","qr"].forEach((id) => $(id).addEventListener("input", buildJob));
+buildJob();
+
+function checkSafe(text) {
+  for (const raw of text.split(/\r?\n/)) {
+    const l = raw.trim().toUpperCase();
+    if (DENY.some((p) => l.startsWith(p))) throw new Error("Bloqueado pela denylist: " + l.slice(0, 40));
+  }
+}
+
+async function send(bytes) {
+  const c = chars[+$("charSel").value];
+  if (!c) throw new Error("Nenhuma característica selecionada");
+  const n = Math.max(20, +$("chunk").value || 20);
+  for (let i = 0; i < bytes.length; i += n) {
+    const part = bytes.slice(i, i + n);
+    if (c.properties.writeWithoutResponse) await c.writeValueWithoutResponse(part);
+    else await c.writeValueWithResponse(part);
+    await new Promise((r) => setTimeout(r, 15));
+  }
+  log(`enviados ${bytes.length} bytes em blocos de ${n} → ${c.service.uuid.slice(0, 8)}/${c.uuid.slice(0, 8)}`);
+}
+
+$("btnConnect").onclick = async () => {
+  try {
+    if (!navigator.bluetooth) throw new Error("Web Bluetooth indisponível (use Chrome Android/desktop, HTTPS ou localhost).");
+    device = await navigator.bluetooth.requestDevice({ filters: [{ namePrefix: "PT-260" }], optionalServices: SERVICES });
+    device.addEventListener("gattserverdisconnected", () => { log("desconectado"); setConnected(false); });
+    const server = await device.gatt.connect();
+    log("conectado: " + device.name);
+    chars = []; notifyChars = [];
+    for (const svc of await server.getPrimaryServices()) {
+      log("serviço " + svc.uuid);
+      for (const c of await svc.getCharacteristics()) {
+        const p = c.properties, props = ["read","write","writeWithoutResponse","notify","indicate"].filter((k) => p[k]);
+        log("  caract. " + c.uuid + " [" + props.join(", ") + "]");
+        if (p.write || p.writeWithoutResponse) chars.push(c);
+        if (p.notify) notifyChars.push(c);
+      }
+    }
+    for (const c of notifyChars) {
+      try {
+        await c.startNotifications();
+        c.addEventListener("characteristicvaluechanged", (e) => {
+          const v = new Uint8Array(e.target.value.buffer);
+          log("notify " + c.uuid.slice(0, 8) + ": " + [...v].map((b) => b.toString(16).padStart(2, "0")).join(" "));
+        });
+      } catch (e) { log("notify falhou em " + c.uuid.slice(0, 8)); }
+    }
+    const pref = ["49535343-8841", "bef8d6c9", "00002af1", "0000ff02"];
+    $("charSel").innerHTML = chars.map((c, i) => `<option value="${i}">${c.service.uuid.slice(0, 8)} / ${c.uuid}</option>`).join("");
+    const best = chars.findIndex((c) => pref.some((p) => c.uuid.startsWith(p)));
+    if (best >= 0) $("charSel").value = best;
+    setConnected(chars.length > 0);
+    if (!chars.length) log("nenhuma característica gravável encontrada");
+  } catch (e) { log("erro: " + e.message); }
+};
+
+$("btnDisconnect").onclick = () => device && device.gatt.connected && device.gatt.disconnect();
+
+$("btnPrint").onclick = async () => {
+  try {
+    const text = $("job").value.trim().replace(/\r?\n/g, "\r\n") + "\r\n";
+    checkSafe(text);
+    await send(new TextEncoder().encode(text));
+  } catch (e) { log("erro: " + e.message); }
+};
+$("btnGap").onclick = async () => {
+  if (!confirm("GAPDETECT avança algumas etiquetas para calibrar o sensor. Continuar?")) return;
+  const w = +$("w").value, h = +$("h").value, g = +$("gap").value;
+  try { await send(new TextEncoder().encode(`SIZE ${w} mm,${h} mm\r\nGAP ${g} mm,0 mm\r\nGAPDETECT\r\n`)); } catch (e) { log("erro: " + e.message); }
+};
+$("btnStatus").onclick = async () => {
+  try { await send(new Uint8Array([0x1b, 0x21, 0x3f])); log("aguardando resposta via notify…"); } catch (e) { log("erro: " + e.message); }
+};
+
+function setConnected(on) {
+  ["btnPrint","btnGap","btnStatus","btnDisconnect"].forEach((id) => $(id).disabled = !on);
+  $("charSel").disabled = !on;
+}
+</script>
+</body>
+</html>

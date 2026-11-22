@@ -1,0 +1,21 @@
+{
+  "status": "prepared_not_saved",
+  "checkpoint_id": "43b941682f8614c13d67fb6a757d8d1fd2497a554e6f506001f3cf7a00726605",
+  "request": {
+    "contexto": {
+      "projeto": "rotuladora-pt260",
+      "titulo": "Checkpoint do harness: rotuladora-pt260",
+      "resumo": "Avaliar alterar firmware/hardware da PT-260 para operar como Phomemo M110 e documentar. Autoteste mostrou TSPL+CPCL (fw 6137): nao e familia M110. Recomendado driver TSPL proprio; firmware intocado.\nArtefatos:\nhttps://github.com/Bezews/rotuladora/tree/claude/wonderful-fermat-q8sw5h\nwiki/projetos/rotuladora-pt260.md\nraw/claude-code/2026-11-22-rotuladora-pt260-handoff.md",
+      "decisoes": [],
+      "proximos_passos": [
+        "Caio: nRF Connect para UUIDs BLE de PT-260_FE9C e etiqueta TSPL de teste via Serial Bluetooth Terminal",
+        "Medir etiquetas e executar sequencia GAPDETECT da transparente",
+        "Portar gerador TSPL ao inventario apos UUID BLE confirmado"
+      ],
+      "origem": "claude-code",
+      "referencia": "harness:43b941682f8614c13d67fb6a757d8d1fd2497a554e6f506001f3cf7a00726605;source:c7a922cca057f6838b72562342d5b3b0a393f17a6bb129d16b2419c22e3e94f2",
+      "sensibilidade": "internal"
+    },
+    "chave_requisicao": "harness:43b941682f8614c13d67fb6a757d8d1fd2497a554e6f506001f3cf7a00726605"
+  }
+}
